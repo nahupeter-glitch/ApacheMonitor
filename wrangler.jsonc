@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "apache-monitor",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/data.json"] },
+  "durable_objects": { "bindings": [{ "name": "MONITOR", "class_name": "ApacheMonitor" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ApacheMonitor"] }],
+  "triggers": { "crons": ["7,17,27,37,47,57 * * * *"] }
+}
