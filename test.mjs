@@ -35,3 +35,11 @@ test('visitas no consultan la fuente ni adelantan alarma existente', async t => 
   await f.monitor.fetch(new Request('https://test/data.json')); const first=f.alarm();
   await f.monitor.fetch(new Request('https://test/data.json')); assert.equal(f.alarm(),first);
 });
+test('toma el cupo para calcular vendidas y descarta cupos incoherentes', () => {
+  const [a,b,c]=normalize({ok:true,seatCategories:[
+    {seatCategoryId:1,label:'GENERAL - SUR ALTA',availability:768,quota:1000,chargePrice:149500},
+    {seatCategoryId:2,label:'PLATEA X',availability:5,quota:2,chargePrice:200000},
+    {seatCategoryId:3,label:'PLATEA Y',availability:0,chargePrice:200000}]});
+  assert.equal(a.quota,1000); assert.equal(a.quota-a.available,232);
+  assert.equal(b.quota,null); assert.equal(c.quota,null);
+});

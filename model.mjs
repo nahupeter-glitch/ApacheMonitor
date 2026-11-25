@@ -2,7 +2,9 @@ export function normalize(payload) {
   if (payload.ok !== true || !Array.isArray(payload.seatCategories) || !payload.seatCategories.length) throw new Error('Respuesta de disponibilidad inválida');
   return payload.seatCategories.filter(s => s.chargePrice >= 10000).map(s => {
     if (!Number.isSafeInteger(s.availability) || s.availability < 0 || !Number.isFinite(s.chargePrice) || typeof s.label !== 'string') throw new Error('Sector inválido');
-    return { id: String(s.seatCategoryId), label: s.label, available: s.availability, price: s.chargePrice, level: s.availabilityLevel };
+    // quota = cupo habilitado para la venta. Si falta o es incoherente, no se inventa.
+    const quota = Number.isSafeInteger(s.quota) && s.quota >= s.availability ? s.quota : null;
+    return { id: String(s.seatCategoryId), label: s.label, available: s.availability, quota, price: s.chargePrice, level: s.availabilityLevel };
   });
 }
 export function merge(previous, sectors, now) {
