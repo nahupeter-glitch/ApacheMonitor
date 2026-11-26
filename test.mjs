@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ApacheMonitor } from './worker.mjs';
+import worker, { ApacheMonitor, PAUSA } from './worker.mjs';
 import { normalize, merge } from './model.mjs';
 function fixture(initial = {}) {
   const values = new Map(Object.entries(initial)); let alarm = null;
@@ -42,4 +42,11 @@ test('toma el cupo para calcular vendidas y descarta cupos incoherentes', () => 
     {seatCategoryId:3,label:'PLATEA Y',availability:0,chargePrice:200000}]});
   assert.equal(a.quota,1000); assert.equal(a.quota-a.available,232);
   assert.equal(b.quota,null); assert.equal(c.quota,null);
+});
+test('en pausa /data.json no entrega datos ni toca el recolector', async () => {
+  const prev=PAUSA.activa; PAUSA.activa=true;
+  const env={MONITOR:{idFromName(){throw Error('No debe tocar el recolector')}},ASSETS:{fetch:()=>new Response('asset')}};
+  const body=await (await worker.fetch(new Request('https://x/data.json'),env)).json();
+  assert.equal(body.pausa,true); assert.equal(body.sectors,undefined); assert.match(body.mensaje,/pausa/);
+  PAUSA.activa=prev;
 });
