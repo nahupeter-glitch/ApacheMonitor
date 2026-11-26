@@ -3,11 +3,24 @@ import { normalize, merge } from './model.mjs';
 const ENDPOINT = 'https://apache.fantixtickets.com/api/secutix/events/10229236932393/availability?performanceId=10229237774708';
 const INTERVAL = 30000;
 const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
+// ===== MODO PAUSA =====
+// activa: true  -> /data.json NO entrega datos; el panel muestra la cuenta regresiva.
+// activa: false -> vuelve el monitor en vivo. El recolector sigue corriendo en ambos casos.
+export const PAUSA = {
+  activa: true,
+  titulo: 'VENTA GENERAL',
+  fecha: 'Viernes 27 a las 12:00 hs',
+  inicio: '2026-11-27T12:00:00-03:00'
+};
 
 export default {
   async fetch(request, env) {
     if (new URL(request.url).pathname !== '/data.json') return env.ASSETS.fetch(request);
     if (!['GET', 'HEAD'].includes(request.method)) return new Response('Método no permitido', { status: 405, headers: { Allow: 'GET, HEAD' } });
+    if (PAUSA.activa) {
+      const body = { pausa: true, mensaje: '¿Sos boludo o no entendés que está en pausa?', titulo: PAUSA.titulo, fecha: PAUSA.fecha, inicio: PAUSA.inicio };
+      return new Response(request.method === 'HEAD' ? null : JSON.stringify(body), { headers });
+    }
     const stub = env.MONITOR.get(env.MONITOR.idFromName('apache-availability'));
     return stub.fetch(request);
   },
