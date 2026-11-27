@@ -7,7 +7,7 @@ const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Cont
 // activa: true  -> /data.json NO entrega datos; el panel muestra la cuenta regresiva.
 // activa: false -> vuelve el monitor en vivo. El recolector sigue corriendo en ambos casos.
 export const PAUSA = {
-  activa: true,
+  activa: false,
   titulo: 'VENTA GENERAL',
   fecha: 'Viernes 27 a las 12:00 hs',
   inicio: '2026-11-27T12:00:00-03:00'
