@@ -2,6 +2,8 @@ import { normalize, merge } from './model.mjs';
 
 const ENDPOINT = 'https://apache.fantixtickets.com/api/secutix/events/10229236932393/availability?performanceId=10229237774708';
 const INTERVAL = 30000;
+const QUEUE = 'https://apache.fantixtickets.com/api/queue/gate';
+const SALES = 'https://apache.fantixtickets.com/api/site-auth/sales-status';
 const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
 // ===== MODO PAUSA =====
 // activa: true  -> /data.json NO entrega datos; el panel muestra la cuenta regresiva.
@@ -65,6 +67,10 @@ export class ApacheMonitor {
       const sectors = normalize(payload);
       if (!sectors.length) throw new Error('La fuente no devolvió sectores válidos');
       snapshot = { ...merge(previous, sectors, new Date().toISOString()), title: payload.eventTitle, intervalSeconds: 30 };
+      // Datos extra públicos: solo si la fuente principal respondió bien. Nunca usan sesión.
+      const [queue, sales] = await Promise.all([readJson(QUEUE), readJson(SALES)]);
+      snapshot.queue = parseQueue(queue, previous.queue, Date.now()) || previous.queue || null;
+      snapshot.sales = parseSales(sales) || previous.sales || null;
     } catch (error) {
       next = Date.now() + (error.delay || 60000);
       snapshot = { ...previous, intervalSeconds: 30, checkedAt: new Date().toISOString(), error: error.message, retryAfter: new Date(next).toISOString() };
@@ -72,4 +78,29 @@ export class ApacheMonitor {
     await this.ctx.storage.put('snapshot', snapshot);
     await this.ctx.storage.setAlarm(Math.max(Date.now() + 1000, next));
   }
+}
+
+async function readJson(url) {
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+export function parseQueue(q, prev, now) {
+  const ok = n => Number.isSafeInteger(n) && n >= 0;
+  if (!q || !ok(q.servingTicket) || !ok(q.nextTicket) || q.nextTicket < q.servingTicket) return null;
+  const depth = ok(q.queueDepth) ? q.queueDepth : q.nextTicket - q.servingTicket;
+  // Ritmo medido entre lecturas (personas/minuto), suavizado. Si no hay dato, el informado por la fila.
+  let measured = prev?.measuredPerMinute ?? null;
+  const dt = (now - (Date.parse(prev?.at || '') || 0)) / 60000;
+  if (prev && dt > 0.2 && dt < 15 && q.servingTicket >= prev.serving) {
+    const rate = (q.servingTicket - prev.serving) / dt;
+    measured = measured == null ? rate : measured * 0.6 + rate * 0.4;
+  }
+  return { at: new Date(now).toISOString(), enabled: q.enabled !== false, hold: !!q.hold, depth, serving: q.servingTicket, next: q.nextTicket,
+    perMinute: ok(q.admissionsPerMinute) ? q.admissionsPerMinute : null, measuredPerMinute: measured == null ? null : Math.round(measured) };
+}
+export function parseSales(s) {
+  if (!s || s.ok !== true) return null;
+  return { open: !!s.ticketSalesOpen, phase: String(s.phase || ''), paused: !!s.pausedAt };
 }
