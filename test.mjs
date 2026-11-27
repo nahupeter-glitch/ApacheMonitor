@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { ApacheMonitor, PAUSA } from './worker.mjs';
+import worker, { ApacheMonitor, PAUSA, parseQueue } from './worker.mjs';
 import { normalize, merge } from './model.mjs';
 function fixture(initial = {}) {
   const values = new Map(Object.entries(initial)); let alarm = null;
@@ -49,4 +49,12 @@ test('en pausa /data.json no entrega datos ni toca el recolector', async () => {
   const body=await (await worker.fetch(new Request('https://x/data.json'),env)).json();
   assert.equal(body.pausa,true); assert.equal(body.sectors,undefined); assert.match(body.mensaje,/pausa/);
   PAUSA.activa=prev;
+});
+test('lee la fila y mide el ritmo entre lecturas', () => {
+  const t0=Date.parse('2026-11-27T15:36:00Z');
+  const a=parseQueue({enabled:true,queueDepth:875605,servingTicket:327176,nextTicket:1202781,admissionsPerMinute:200},null,t0);
+  assert.equal(a.depth,875605); assert.equal(a.measuredPerMinute,null);
+  const b=parseQueue({queueDepth:875000,servingTicket:327276,nextTicket:1202900,admissionsPerMinute:200},a,t0+30000);
+  assert.equal(b.measuredPerMinute,200);
+  assert.equal(parseQueue({servingTicket:'x'},a,t0),null); assert.equal(parseQueue(null,a,t0),null);
 });
